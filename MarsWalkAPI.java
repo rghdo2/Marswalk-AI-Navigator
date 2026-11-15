@@ -1,6 +1,7 @@
 
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpExchange;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -10,130 +11,46 @@ public class MarsWalkAPI {
 
     public static void main(String[] args) throws IOException {
 
-        String portValue = System.getenv("PORT");
-
-        int port = (portValue == null || portValue.isBlank())
-                ? 8080
-                : Integer.parseInt(portValue);
-
         HttpServer server = HttpServer.create(
-                new InetSocketAddress("0.0.0.0", port), 0
+            new InetSocketAddress("localhost", 8080), 0
         );
 
         // API status endpoint
         server.createContext("/api/status", exchange -> {
 
-            sendJson(
-                exchange,
-                "{\"project\":\"MarsWalk AI Navigator\",\"status\":\"running\"}",
-                200
-            );
+            String response =
+                "{\"project\":\"MarsWalk AI Navigator\","
+                + "\"status\":\"running\"}";
+
+            sendJson(exchange, response);
         });
 
-        // Mission planning endpoint
+        // Mission recommendation endpoint
         server.createContext("/api/mission", exchange -> {
 
-            if (!exchange.getRequestMethod().equals("GET")) {
+            String response = MissionService.getMissionResult();
 
-                sendJson(
-                    exchange,
-                    "{\"error\":\"Method not allowed\"}",
-                    405
-                );
-
-                return;
-            }
-
-            double availableTime = 180;
-
-            String query = exchange.getRequestURI().getRawQuery();
-
-            if (query != null) {
-
-                for (String parameter : query.split("&")) {
-
-                    if (parameter.startsWith("time=")) {
-
-                        try {
-
-                            availableTime = Double.parseDouble(
-                                parameter.substring(5)
-                            );
-
-                        } catch (NumberFormatException e) {
-
-                            sendJson(
-                                exchange,
-                                "{\"error\":\"Invalid time value\"}",
-                                400
-                            );
-
-                            return;
-                        }
-                    }
-                }
-            }
-
-            // Validate mission time
-            if (!Double.isFinite(availableTime)
-                    || availableTime <= 0
-                    || availableTime > 10080) {
-
-                sendJson(
-                    exchange,
-                    "{\"error\":\"Time must be between 0 and 10080 minutes\"}",
-                    400
-                );
-
-                return;
-            }
-
-            // Generate mission recommendation
-            String response =
-                MissionService.getMissionResult(availableTime);
-
-            sendJson(exchange, response, 200);
+            sendJson(exchange, response);
         });
 
         server.start();
 
         System.out.println("=== MarsWalk API ===");
-        System.out.println("Server is running on port " + port);
+        System.out.println("Server is running!");
+        System.out.println("Status: http://localhost:8080/api/status");
+        System.out.println("Mission: http://localhost:8080/api/mission");
     }
 
-    // Send JSON response with CORS support
-    static void sendJson(
-            HttpExchange exchange,
-            String response,
-            int statusCode
-    ) throws IOException {
+    static void sendJson(HttpExchange exchange, String response)
+            throws IOException {
 
-        byte[] data = response.getBytes(
-            StandardCharsets.UTF_8
-        );
-
-        // JSON content type
-        exchange.getResponseHeaders().set(
-            "Content-Type",
-            "application/json; charset=UTF-8"
-        );
-
-        // Allow browser requests from other origins
-        exchange.getResponseHeaders().set(
-            "Access-Control-Allow-Origin",
-            "*"
-        );
+        byte[] data = response.getBytes(StandardCharsets.UTF_8);
 
         exchange.getResponseHeaders().set(
-            "Access-Control-Allow-Methods",
-            "GET"
+            "Content-Type", "application/json; charset=UTF-8"
         );
 
-        // Send response
-        exchange.sendResponseHeaders(
-            statusCode,
-            data.length
-        );
+        exchange.sendResponseHeaders(200, data.length);
 
         try (OutputStream output = exchange.getResponseBody()) {
             output.write(data);

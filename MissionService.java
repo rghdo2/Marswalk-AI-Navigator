@@ -1,10 +1,9 @@
 
-
 import java.util.Locale;
 
 public class MissionService {
 
-    public static String getMissionResult(double availableTime) {
+    public static String getMissionResult() {
 
         RoutePlanner.setupMap();
 
@@ -16,6 +15,7 @@ public class MissionService {
 
         double explorationTime = 20;
         double safetyBuffer = 15;
+        double availableTime = 180;
 
         String recommendedSite = "";
         double bestScore = -1;
@@ -52,10 +52,7 @@ public class MissionService {
         }
 
         if (recommendedSite.isEmpty()) {
-            return String.format(Locale.US,
-                "{\"status\":\"NO_FEASIBLE_MISSION\","
-                + "\"availableTime\":%.1f}",
-                availableTime);
+            return "{\"status\":\"NO_FEASIBLE_MISSION\"}";
         }
 
         return String.format(Locale.US,

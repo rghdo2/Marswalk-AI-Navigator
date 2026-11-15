@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MarsWalk AI Navigator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Ccircle cx='4' cy='4' r='4' fill='%23FF776D'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<!-- مكتبة Leaflet لخريطة 2D -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="style.css">
+<style>
+  /* تنسيقات إضافية لعناصر الخريطة 2D و 3D وأزرار التحكم */
+  .mw-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 16px 0; }
+  .mw-toolbar button { font: 600 13px 'JetBrains Mono', monospace; padding: 8px 16px; border-radius: 99px; border: 1px solid var(--bd); background: var(--gl); color: var(--tx); cursor: pointer; }
+  .mw-toolbar button.active { background: var(--cy); color: #080812; border-color: var(--cy); }
+  .mw-pin { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; color: #101827; font: 800 13px/24px Sora, sans-serif; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,.5); }
+  .mw-legend { background: rgba(16,24,39,.9); color: #e5e7eb; padding: 10px 12px; border-radius: 10px; border: 1px solid #45546a; font: 12px/1.5 Sora, sans-serif; }
+  .mw-legend i { display: inline-block; width: 12px; height: 12px; margin-right: 6px; border-radius: 3px; vertical-align: middle; }
+  .mw-legend small { display: block; color: #9ca3af; margin-top: 6px; font-size: 10.5px; }
+  .mw-3d-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--cy); font-family: 'JetBrains Mono', monospace; pointer-events: none; }
+</style>
+</head>
+<body>
+<nav><b>MARSWALK AI</b><a href="#challenge">Challenge</a><a href="#solution">Solution</a><a href="#planner">Planner</a><a href="#map">Map</a><a href="#analysis">Analysis</a><a href="#return">Safe return</a><a class="cta" href="#hud">Helmet HUD</a><a href="#data">Sources</a><a href="#vision">Vision</a></nav>
+
+<section class="hero" id="top">
+<canvas id="planet" width="520" height="520" aria-hidden="true"></canvas>
+<span class="tag" style="width:fit-content;margin-bottom:22px;position:relative">NASA Space Apps · Interplanetary Survival Guide: Martian Map</span>
+<h1>MarsWalk<span>AI Navigator</span></h1>
+<p class="tline">Where to Explore. How to Get There. When to Return.</p>
+<p>One mission system for the Jezero Crater region, from the planner and the map to the astronaut’s visor.</p>
+<div class="row"><a class="btn p" href="#planner">Enter Mission Control</a><a class="btn" href="#hud">Open Helmet HUD</a></div>
+<div class="stats"><div><b>3</b><small>decisions: where, how, when</small></div><div><b>A*</b><small>explainable routing, no ML claims</small></div><div><b>GO / NO-GO / RETURN</b><small>live safe-return logic</small></div></div>
+</section>
+
+<section id="challenge"><h2>Mars punishes small mistakes</h2>
+<div class="grid">
+<div class="card"><h3>Terrain you can’t shortcut</h3><p>Craters, boulder fields and steep slopes decide whether a straight line is a route or a trap.</p></div>
+<div class="card"><h3>Time is a resource</h3><p>Every minute out is a minute you must be able to walk back, with margin to spare.</p></div>
+<div class="card"><h3>Science competes with safety</h3><p>The best site is only the best if the crew can reach it and return in the time they have.</p></div></div></section>
+
+<section id="solution"><h2>One intelligent mission system</h2>
+<div class="grid">
+<div class="card q"><b>1</b><h3>Where to explore</h3><p>Scores two Jezero sites on science value, distance, terrain and risk.</p></div>
+<div class="card q"><b>2</b><h3>How to get there</h3><p>A* pathfinding over slope and hazard cost. Safest and shortest routes, side by side.</p></div>
+<div class="card q"><b>3</b><h3>When to return</h3><p>Travel, science and return time plus a buffer produce a GO, NO-GO or RETURN call.</p></div></div>
+<p style="margin-top:22px">The map, the planner and the helmet all read one shared route object, so nothing on the visor is hard-coded.</p></section>
+
+<section id="planner"><h2>Scientific Mission Planner</h2>
+<div class="pl"><div class="card">
+<label class="l">Base camp</label><div class="m" style="font-size:13px">Base Camp Alpha · Jezero Crater</div>
+<label class="l">Destination</label><div class="opt" id="optDest"></div>
+<label class="l">Available mission time: <b id="tv" class="m"></b></label><input type="range" id="tr" min="60" max="480" step="15" value="360">
+<label class="l">Routing priority</label><div class="seg" id="segP"><button data-p="safe" class="on">Safest</button><button data-p="short">Shortest</button></div>
+</div>
+<div class="card hl"><div class="dec" id="decT"></div><p id="decW" style="color:var(--tx)"></p><div class="bar" id="bar"></div><div class="leg" id="leg"></div>
+<p id="rec" style="margin-top:16px"></p><div class="row"><a class="btn p" href="#map">View route on map</a><a class="btn" href="#hud" id="toHud">Start in helmet</a></div></div></div></section>
+
+<section id="map">
+  <h2>Interactive Mars Map (2D & 3D Jezero Crater)</h2>
+  <p>Real USGS CTX 6m orthomosaic & 20m Digital Terrain Model (30.3 × 30.2 km). Drag Base (B) or switch between 2D and 3D terrain views.</p>
+
+  <!-- أزرار التحكم بالخريطة 2D / 3D والطبقات -->
+  <div class="mw-toolbar">
+    <button id="view2d" type="button" class="active">2D Map</button>
+    <button id="view3d" type="button">3D Terrain</button>
+    <span id="exagBox" hidden style="align-items:center;gap:8px;font-size:13px;color:var(--ro)">
+      Height scale: <input type="range" id="exag" min="1" max="8" step="0.5" value="2" style="width:110px"> <b id="exagVal" class="m">×2</b>
+    </span>
+    <label style="font-size:13px;color:var(--mu);margin-left:auto"><input type="checkbox" id="tHaz" checked> Slope Hazards</label>
+    <label style="font-size:13px;color:var(--mu)"><input type="checkbox" id="tSites" checked> Science Sites</label>
+    <label style="font-size:13px;color:var(--mu)"><input type="checkbox" id="tRoutes" checked> Routes</label>
+    <label style="font-size:13px;color:var(--mu)"><input type="checkbox" id="tStudy"> Study Area</label>
+    <label style="font-size:13px;color:var(--mu)"><input type="checkbox" id="tGrid"> 5km Grid</label>
+  </div>
+
+  <!-- حاوية الخريطة ثنائية الأبعاد وثلاثية الأبعاد -->
+  <div id="mapMount" style="position:relative">
+    <div id="mars-map" style="width:100%; height:560px; border-radius:18px; overflow:hidden; border:1px solid var(--bd);"></div>
+    <div id="mars-3d" hidden style="position:relative; width:100%; height:560px; border-radius:18px; overflow:hidden; border:1px solid var(--bd); background:#0b1220;"></div>
+  </div>
+  <div id="result" class="card" style="margin-top:14px;font-size:14px;color:var(--tx)"></div>
+
+  <!-- الخريطة المحاكاة الأصلية للموقع -->
+  <details style="margin-top:24px">
+    <summary style="cursor:pointer;color:var(--ro);font-size:14px">Show Grid Simulation Canvas (Fallback)</summary>
+    <div class="tg" id="layers"></div>
+    <div class="mapw"><span class="demo">DEMO MODE — Simulated Terrain</span><canvas id="cv" width="1600" height="1000"></canvas></div>
+  </details>
+</section>
+
+<section id="analysis"><h2>Terrain, Hazards & Route Comparison</h2>
+<div class="card"><table id="rt"></table></div>
+<p style="margin-top:16px" id="why"></p>
+<div class="card" style="margin-top:18px"><h3>Destination comparison</h3><table id="dt"></table></div></section>
+
+<section id="return"><h2>Smart Safe Return</h2>
+<p>Every figure below is calculated from the mission model. <span class="tag">Assumptions (simulated): 1.2 km/h, 20% buffer, 25 m cells, slope limits 14°/18°</span></p>
+<div class="card hl"><div class="rtop"><div><div class="m sm">DECISION</div><div class="dec" id="rD"></div></div><p id="rW" style="color:var(--tx);margin:0"></p></div>
+<div class="bar big" id="rBar"></div><div class="kp" id="rK"></div>
+<div class="row" style="margin-top:18px"><button class="btn d" id="bPrev">Show emergency return route</button><a class="btn" href="#map">See on map</a><a class="btn p" href="#hud">Walk it in the helmet</a></div>
+<p id="rE" class="m" style="margin:14px 0 0;font-size:13px"></p></div></section>
+
+<section id="hud">
+    <h2>Astronaut Smart Helmet HUD</h2>
+    <p>Explore the original interactive smart helmet developed by our team.</p>
+    <button class="btn p" id="loadHelmet" type="button">Load Smart Helmet</button>
+    <p id="helmetStatus">Helmet is ready to load.</p>
+    <div id="helmetMount"></div>
+</section>
+
+<section id="data"><h2>NASA Data & Scientific Sources</h2>
+<div class="grid">
+<div class="card"><h3>Integration targets</h3><p>Mars 2020 Perseverance landing-site context (Jezero Crater, ancient river delta). HiRISE and CTX imagery with derived digital terrain models, and MOLA elevation, all via NASA PDS and the USGS Astrogeology archive.</p></div>
+<div class="card"><h3>What is simulated here</h3><p>Elevation, slopes, crater hazards, site coordinates, science scores and all timings in this page are generated demonstration data. Nothing here is real survey data.</p></div>
+<div class="card"><h3>Connecting real data</h3><p>Real USGS CTX DTM and imagery are loaded via <span class="m">terrain-grid.js</span>, <span class="m">dem-grid.js</span>, and <span class="m">images-data.js</span>.</p></div></div></section>
+
+<section id="vision"><h2>Innovation, impact and what’s next</h2>
+<div class="grid">
+<div class="card"><h3>Explainable by design</h3><p>Rule-based cost routing, described honestly. Every decision shows its inputs.</p></div>
+<div class="card"><h3>One source of truth</h3><p>Map, planner and helmet share one route model, so they can never disagree.</p></div>
+<div class="card"><h3>Next</h3><p>Real DTM slopes, rover and orbiter hazard updates, multi-day traverses, and voice guidance in the visor.</p></div></div>
+<p style="margin-top:28px;font-size:20px;color:var(--ro);max-width:50ch">MarsWalk AI Navigator doesn’t just show astronauts where to go. It helps them decide where to explore, how to get there, and when to return safely.</p></section>
+<footer>MarsWalk AI Navigator · NASA Space Apps 2026 prototype</footer>
+
+<!-- 1. المكتبات الخارجية المطلوبة للخرائط -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<!-- 2. ملفات البيانات والتضاريس والصور -->
+<script src="js/mars-map/images-data.js"></script>
+<script src="js/mars-map/terrain-grid.js"></script>
+<script src="js/mars-map/dem-grid.js"></script>
+
+<!-- 3. ملفات الخرائط (2D و 3D) ومحرك الملاحة -->
+<script src="js/mars-map/map.js"></script>
+<script src="js/mars-map/map3d.js"></script>
+<script src="js/mars-map/nav.js"></script>
+
+<!-- 4. ملف التطبيق الرئيسي لزميلتك -->
+<script src="app.js"></script>
+
+<!-- 5. جسر الربط والتزامن بين المخطط وخرائط 2D/3D -->
+<script>
+(function() {
+  function triggerRealMapNav() {
+    if (!window.MarsMap || !window.MarsNav) return;
+    const sites = window.MarsMap.region.sites;
+    const targetSite = (typeof S !== "undefined" && S.dest === "B") ? sites[1] : sites[0];
+    const mins = (typeof S !== "undefined" && S.time) ? S.time : 360;
+    window.dispatchEvent(new CustomEvent("marswalk:plan", {
+      detail: { base: window.MarsMap.getBase(), site: targetSite, minutes: mins }
+    }));
+  }
+  window.addEventListener("marswalk:ready", triggerRealMapNav);
+  window.addEventListener("marswalk:base", triggerRealMapNav);
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(triggerRealMapNav, 400);
+    const tr = document.getElementById("tr");
+    if (tr) tr.addEventListener("input", triggerRealMapNav);
+    const opt = document.getElementById("optDest");
+    if (opt) opt.addEventListener("click", () => setTimeout(triggerRealMapNav, 50));
+  });
+})();
+</script>
+</body>
+</html>
+
+
