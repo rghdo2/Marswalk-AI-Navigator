@@ -23,18 +23,54 @@ public class MarsWalkAPI {
 
         server.createContext("/api/status", exchange -> {
 
-            String response =
+            sendJson(exchange,
                 "{\"project\":\"MarsWalk AI Navigator\","
-                + "\"status\":\"running\"}";
-
-            sendJson(exchange, response);
+                + "\"status\":\"running\"}", 200);
         });
 
         server.createContext("/api/mission", exchange -> {
 
-            String response = MissionService.getMissionResult();
+            if (!exchange.getRequestMethod().equals("GET")) {
+                sendJson(exchange,
+                    "{\"error\":\"Method not allowed\"}", 405);
+                return;
+            }
 
-            sendJson(exchange, response);
+            double availableTime = 180;
+
+            String query = exchange.getRequestURI().getRawQuery();
+
+            if (query != null) {
+                for (String parameter : query.split("&")) {
+
+                    if (parameter.startsWith("time=")) {
+                        try {
+                            availableTime = Double.parseDouble(
+                                parameter.substring(5)
+                            );
+                        } catch (NumberFormatException e) {
+                            sendJson(exchange,
+                                "{\"error\":\"Invalid time value\"}", 400);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            if (!Double.isFinite(availableTime)
+                    || availableTime <= 0
+                    || availableTime > 10080) {
+
+                sendJson(exchange,
+                    "{\"error\":\"Time must be between 0 and 10080 minutes\"}",
+                    400);
+                return;
+            }
+
+            String response =
+                MissionService.getMissionResult(availableTime);
+
+            sendJson(exchange, response, 200);
         });
 
         server.start();
@@ -43,8 +79,10 @@ public class MarsWalkAPI {
         System.out.println("Server is running on port " + port);
     }
 
-    static void sendJson(HttpExchange exchange, String response)
-            throws IOException {
+    static void sendJson(
+            HttpExchange exchange,
+            String response,
+            int statusCode) throws IOException {
 
         byte[] data = response.getBytes(StandardCharsets.UTF_8);
 
@@ -52,7 +90,7 @@ public class MarsWalkAPI {
             "Content-Type", "application/json; charset=UTF-8"
         );
 
-        exchange.sendResponseHeaders(200, data.length);
+        exchange.sendResponseHeaders(statusCode, data.length);
 
         try (OutputStream output = exchange.getResponseBody()) {
             output.write(data);
